@@ -32,7 +32,7 @@ requires-python = ">=3.8"
 license = { "text" = "AGPL-3.0" }
 keywords = ["machine-learning", "deep-learning", "computer-vision", "object-detection", "YOLO", "DINOv2", "deterministic-training"]
 authors = [
-    { name = "YOLO-DINOv2 contributors" },
+    { name = "Diego Benito Montoya" },
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
