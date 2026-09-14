@@ -80,14 +80,24 @@ class DetectionValidator(BaseValidator):
         self.nc = len(model.names)
         self.metrics.names = self.names
         self.metrics.plot = self.args.plots
-        self.confusion_matrix = ConfusionMatrix(nc=self.nc, conf=self.args.conf)
+        self.metrics.use_containment = getattr(self.args, "use_containment", False)
+
+        self.confusion_matrix = ConfusionMatrix(
+            nc=self.nc,
+            conf=self.args.conf,
+            use_containment=getattr(self.args, "use_containment", False),
+        )
         self.seen = 0
         self.jdict = []
-        self.stats = dict(tp=[], conf=[], pred_cls=[], target_cls=[], target_img=[])
+        self.stats = dict(tp=[], conf=[], pred_cls=[], target_cls=[], target_img=[], iou=[])
 
     def get_desc(self):
         """Return a formatted string summarizing class metrics of YOLO model."""
-        return ("%22s" + "%11s" * 6) % ("Class", "Images", "Instances", "Box(P", "R", "mAP50", "mAP50-95)")
+        if getattr(self.args, "use_containment", False):
+            metric_names = ("Pseudo-P", "Pseudo-R", "Pseudo-mAP", "Pseudo-mAP")
+        else:
+            metric_names = ("Box(P", "R", "mAP50", "mAP50-95)")
+        return ("%22s" + "%11s" * 6) % ("Class", "Images", "Instances", *metric_names)
 
     def postprocess(self, preds):
         """Apply Non-maximum suppression to prediction outputs."""
@@ -131,6 +141,7 @@ class DetectionValidator(BaseValidator):
                 conf=torch.zeros(0, device=self.device),
                 pred_cls=torch.zeros(0, device=self.device),
                 tp=torch.zeros(npr, self.niou, dtype=torch.bool, device=self.device),
+                iou=torch.zeros(npr, device=self.device),
             )
             pbatch = self._prepare_batch(si, batch)
             cls, bbox = pbatch.pop("cls"), pbatch.pop("bbox")
@@ -154,7 +165,7 @@ class DetectionValidator(BaseValidator):
 
             # Evaluate
             if nl:
-                stat["tp"] = self._process_batch(predn, bbox, cls)
+                stat["tp"], stat["iou"] = self._process_batch(predn, bbox, cls)
             if self.args.plots:
                 self.confusion_matrix.process_batch(predn, bbox, cls)
             for k in self.stats.keys():
@@ -182,13 +193,30 @@ class DetectionValidator(BaseValidator):
         self.nt_per_class = np.bincount(stats["target_cls"].astype(int), minlength=self.nc)
         self.nt_per_image = np.bincount(stats["target_img"].astype(int), minlength=self.nc)
         stats.pop("target_img", None)
+
+
+        #print(f"[DEBUG] iou_values len: {len(self.confusion_matrix.iou_values)}")  # ← añadir
+
+        # mean_iou se calcula igual de simple que cualquier otra media global
+        iou_vals = stats.pop("iou", None)
+        if iou_vals is not None and len(iou_vals) and "tp" in stats and len(stats["tp"]):
+            is_tp_at_50 = stats["tp"][:, 0]   # bool array, True si esa predicción es TP a IoU=0.5
+            if is_tp_at_50.any():
+                self.metrics.mean_iou = float(iou_vals[is_tp_at_50].mean())
+            else:
+                self.metrics.mean_iou = 0.0
+        else:
+            self.metrics.mean_iou = 0.0
+
         if len(stats) and stats["tp"].any():
             self.metrics.process(**stats)
+
         return self.metrics.results_dict
+        
 
     def print_results(self):
         """Prints training/validation set metrics per class."""
-        pf = "%22s" + "%11i" * 2 + "%11.3g" * len(self.metrics.keys)  # print format
+        pf = "%22s" + "%11i" * 2 + "%11.3g" * len(self.metrics.keys)
         LOGGER.info(pf % ("all", self.seen, self.nt_per_class.sum(), *self.metrics.mean_results()))
         if self.nt_per_class.sum() == 0:
             LOGGER.warning(f"WARNING ⚠️ no labels found in {self.args.task} set, can not compute metrics without labels")
@@ -224,8 +252,21 @@ class DetectionValidator(BaseValidator):
             The function does not return any value directly usable for metrics calculation. Instead, it provides an
             intermediate representation used for evaluating predictions against ground truth.
         """
-        iou = box_iou(gt_bboxes, detections[:, :4])
-        return self.match_predictions(detections[:, 5], gt_cls, iou)
+        use_containment = getattr(self.args, "use_containment", False)
+
+
+        if use_containment:
+            #print('val.py')
+
+            from ultralytics.utils.metrics import box_containment
+            # box_containment(pred, gt) devuelve (M_gt, N_pred) — mismo orden que box_iou(gt, pred)
+            iou = box_containment(detections[:, :4], gt_bboxes)
+        else:
+            iou = box_iou(gt_bboxes, detections[:, :4])
+
+        max_iou_per_pred = iou.max(dim=0)[0] if iou.numel() > 0 else torch.zeros(detections.shape[0], device=detections.device)
+
+        return self.match_predictions(detections[:, 5], gt_cls, iou), max_iou_per_pred
 
     def build_dataset(self, img_path, mode="val", batch=None):
         """

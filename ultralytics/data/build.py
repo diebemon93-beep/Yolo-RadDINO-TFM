@@ -79,6 +79,7 @@ def seed_worker(worker_id):  # noqa
     worker_seed = torch.initial_seed() % 2**32
     np.random.seed(worker_seed)
     random.seed(worker_seed)
+    os.environ["PYTHONHASHSEED"] = str(worker_seed)
 
 
 def build_yolo_dataset(cfg, img_path, batch, data, mode="train", rect=False, stride=32, multi_modal=False):
@@ -131,7 +132,8 @@ def build_dataloader(dataset, batch, workers, shuffle=True, rank=-1):
     nw = min(os.cpu_count() // max(nd, 1), workers)  # number of workers
     sampler = None if rank == -1 else distributed.DistributedSampler(dataset, shuffle=shuffle)
     generator = torch.Generator()
-    generator.manual_seed(6148914691236517205 + RANK)
+    # Change the hardcoded seed to use PyTorch's initial seed
+    generator.manual_seed(int(torch.initial_seed()) % (2**32) + RANK)
     return InfiniteDataLoader(
         dataset=dataset,
         batch_size=batch,
@@ -142,6 +144,7 @@ def build_dataloader(dataset, batch, workers, shuffle=True, rank=-1):
         collate_fn=getattr(dataset, "collate_fn", None),
         worker_init_fn=seed_worker,
         generator=generator,
+        persistent_workers=True if nw > 0 else False,
     )
 
 

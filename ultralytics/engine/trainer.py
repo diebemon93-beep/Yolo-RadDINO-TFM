@@ -47,6 +47,7 @@ from ultralytics.utils.torch_utils import (
     ModelEMA,
     autocast,
     convert_optimizer_state_dict_to_fp16,
+    get_num_gradients,
     init_seeds,
     one_cycle,
     select_device,
@@ -247,6 +248,11 @@ class BaseTrainer:
         freeze_layer_names = [f"model.{x}." for x in freeze_list] + always_freeze_names
         for k, v in self.model.named_parameters():
             # v.register_hook(lambda x: torch.nan_to_num(x))  # NaN to 0 (commented for erratic training results)
+
+            if "lora" in k.lower():
+                LOGGER.info(f"Skipping freeze/modification for LoRA layer '{k}'")
+                continue # Pasa de largo y no toca este parámetro bajo ningún concepto
+                
             if any(x in k for x in freeze_layer_names):
                 LOGGER.info(f"Freezing layer '{k}'")
                 v.requires_grad = False
@@ -256,6 +262,13 @@ class BaseTrainer:
                     "See ultralytics.engine.trainer for customization of frozen layers."
                 )
                 v.requires_grad = True
+
+        trainable_params = get_num_gradients(self.model)
+        total_params = sum(x.numel() for x in self.model.parameters())
+        LOGGER.info(
+            f"Trainable gradients after freeze: {trainable_params:,}/{total_params:,} parameters "
+            f"({100 * trainable_params / total_params:.1f}% active)"
+        )
 
         # Check AMP
         self.amp = torch.tensor(self.args.amp).to(self.device)  # True or False
@@ -430,6 +443,8 @@ class BaseTrainer:
                 # Validation
                 if self.args.val or final_epoch or self.stopper.possible_stop or self.stop:
                     self.metrics, self.fitness = self.validate()
+                    #print(f"[DEBUG-DOTRAIN] mean_iou en self.metrics tras validate(): {self.metrics.get('metrics/mean_iou(B)', 'NO ESTÁ')}")
+
                 self.save_metrics(metrics={**self.label_loss_items(self.tloss), **self.metrics, **self.lr})
                 self.stop |= self.stopper(epoch + 1, self.fitness) or final_epoch
                 if self.args.time:
@@ -603,7 +618,10 @@ class BaseTrainer:
         The returned dict is expected to contain "fitness" key.
         """
         metrics = self.validator(self)
-        fitness = metrics.pop("fitness", -self.loss.detach().cpu().numpy())  # use loss as fitness measure if not found
+        # fitness = metrics.pop("fitness", -self.loss.detach().cpu().numpy())  # use loss as fitness measure if not found
+        suffix = "Contain-Pseudo" if getattr(self.validator.metrics, "use_containment", False) else "B"
+        fitness = metrics.get(f"metrics/fitness({suffix})", -self.loss.detach().cpu().numpy())
+
         if not self.best_fitness or self.best_fitness < fitness:
             self.best_fitness = fitness
         return metrics, fitness
@@ -656,6 +674,10 @@ class BaseTrainer:
 
     def save_metrics(self, metrics):
         """Saves training metrics to a CSV file."""
+
+        #print(f"[DEBUG-TRAINER] metrics recibidas: {metrics.get('metrics/mean_iou(B)', 'NO ESTÁ')}")
+
+
         keys, vals = list(metrics.keys()), list(metrics.values())
         n = len(metrics) + 2  # number of cols
         s = "" if self.csv.exists() else (("%s," * n % tuple(["epoch", "time"] + keys)).rstrip(",") + "\n")  # header
@@ -685,7 +707,7 @@ class BaseTrainer:
                     LOGGER.info(f"\nValidating {f}...")
                     self.validator.args.plots = self.args.plots
                     self.metrics = self.validator(model=f)
-                    self.metrics.pop("fitness", None)
+                    # self.metrics.pop("fitness", None)
                     self.run_callbacks("on_fit_epoch_end")
 
     def check_resume(self, overrides):

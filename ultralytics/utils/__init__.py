@@ -1200,7 +1200,7 @@ class SettingsManager(JSONDict):
             "neptune": True,  # Neptune integration
             "raytune": True,  # Ray Tune integration
             "tensorboard": True,  # TensorBoard logging
-            "wandb": False,  # Weights & Biases logging
+            "wandb": True,  # Weights & Biases logging
             "vscode_msg": True,  # VSCode messaging
         }
 
@@ -1323,3 +1323,65 @@ torch.save = torch_save
 if WINDOWS:
     # Apply cv2 patches for non-ASCII and non-UTF characters in image paths
     cv2.imread, cv2.imwrite, cv2.imshow = imread, imwrite, imshow
+
+# # ==============================================================================
+# # 🌟 PARCHE PARA BALANCEO EXCLUSIVO DE CLASES MINORITARIAS (MULTI-GPU COMPATIBLE)
+# # ==============================================================================
+# def _apply_weighted_dataset_patch():
+#     import numpy as np
+#     from ultralytics.data.dataset import YOLODataset
+#     import ultralytics.data.build as build
+
+#     class YOLOWeightedDataset(YOLODataset):
+#         def __init__(self, *args, mode="train", **kwargs):
+#             super().__init__(*args, **kwargs)
+#             self.train_mode = "train" in getattr(self, "prefix", "")
+
+#             if self.train_mode:
+#                 self.count_instances()
+#                 # Umbral más semántico: clases con menos del 50% de la mediana
+#                 umbral_minoritario = np.median(self.counts) * 0.5
+#                 self.minority_classes = np.where(self.counts < umbral_minoritario)[0]
+#                 class_weights = np.sum(self.counts) / self.counts
+#                 self.class_weights = np.array(class_weights)
+#                 self.agg_func = np.max
+#                 self.weights = self.calculate_weights()
+#                 self.probabilities = self.calculate_probabilities()
+
+#         def count_instances(self):
+#             self.counts = np.zeros(len(self.data["names"]), dtype=np.int64)
+#             for label in self.labels:
+#                 cls = label['cls'].reshape(-1).astype(int)
+#                 for id in cls:
+#                     self.counts[id] += 1
+#             self.counts = np.where(self.counts == 0, 1, self.counts)
+
+#         def calculate_weights(self):
+#             weights = []
+#             for label in self.labels:
+#                 cls = label['cls'].reshape(-1).astype(int)
+#                 if cls.size == 0:
+#                     weights.append(1.0)
+#                     continue
+#                 minority_cls = cls[np.isin(cls, self.minority_classes)]
+#                 if minority_cls.size == 0:
+#                     weights.append(1.0)
+#                 else:
+#                     weights.append(self.agg_func(self.class_weights[minority_cls]))
+#             return weights
+
+#         def calculate_probabilities(self):
+#             weights = np.array(self.weights, dtype=np.float64)
+#             return (weights / weights.sum()).tolist()
+
+#         def __getitem__(self, index):
+#             if not self.train_mode:
+#                 return self.transforms(self.get_image_and_label(index))
+#             sampled_index = np.random.choice(len(self.labels), p=self.probabilities)
+#             return self.transforms(self.get_image_and_label(sampled_index))
+
+#     build.YOLODataset = YOLOWeightedDataset
+#     print("🚀 YOLOWeightedDataset (filtro minoritario, umbral 0.5×mediana) inyectado.")
+
+# _apply_weighted_dataset_patch()
+# # ==============================================================================

@@ -66,6 +66,8 @@ class Detect(nn.Module):
         if self.end2end:
             return self.forward_end2end(x)
 
+
+
         for i in range(self.nl):
             x[i] = torch.cat((self.cv2[i](x[i]), self.cv3[i](x[i])), 1)
         if self.training:  # Training path

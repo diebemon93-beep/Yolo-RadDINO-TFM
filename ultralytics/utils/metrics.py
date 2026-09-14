@@ -128,6 +128,30 @@ def bbox_iou(box1, box2, xywh=True, GIoU=False, DIoU=False, CIoU=False, eps=1e-7
         return iou - (c_area - union) / c_area  # GIoU https://arxiv.org/pdf/1902.09630.pdf
     return iou  # IoU
 
+def box_containment(pred_boxes, gt_boxes):
+    """
+    Check if each predicted box is fully contained within each GT box.
+    Args:
+        pred_boxes: (N, 4) tensor [x1, y1, x2, y2]
+        gt_boxes:   (M, 4) tensor [x1, y1, x2, y2]
+    Returns:
+        inside: (M, N) float tensor — 1.0 if pred inside gt, 0.0 otherwise
+    """
+    if pred_boxes.shape[0] == 0 or gt_boxes.shape[0] == 0:
+        return torch.zeros((gt_boxes.shape[0], pred_boxes.shape[0]), dtype=torch.float32, device=pred_boxes.device)
+    
+    # Ajustamos dimensiones para broadcasting (M, N, 4)
+    pred = pred_boxes[None, :, :]   # (1, N, 4)
+    gt   = gt_boxes[:, None, :]     # (M, 1, 4)
+    
+    inside = (
+        (pred[..., 0] >= gt[..., 0]) &   # pred_x1 >= gt_x1
+        (pred[..., 1] >= gt[..., 1]) &   # pred_y1 >= gt_y1
+        (pred[..., 2] <= gt[..., 2]) &   # pred_x2 <= gt_x2
+        (pred[..., 3] <= gt[..., 3])     # pred_y2 <= gt_y2
+    )
+    return inside.float() # Devolvemos float (1.0 o 0.0) para mantener compatibilidad con el resto del pipeline
+
 
 def mask_iou(mask1, mask2, eps=1e-7):
     """
@@ -298,13 +322,15 @@ class ConfusionMatrix:
         iou_thres (float): The Intersection over Union threshold.
     """
 
-    def __init__(self, nc, conf=0.25, iou_thres=0.45, task="detect"):
+    def __init__(self, nc, conf=0.25, iou_thres=0.45, task="detect", use_containment=False):
         """Initialize attributes for the YOLO model."""
         self.task = task
         self.matrix = np.zeros((nc + 1, nc + 1)) if self.task == "detect" else np.zeros((nc, nc))
         self.nc = nc  # number of classes
         self.conf = 0.25 if conf in {None, 0.001} else conf  # apply 0.25 if default val conf is passed
         self.iou_thres = iou_thres
+        self.iou_values = []
+        self.use_containment = use_containment 
 
     def process_cls_preds(self, preds, targets):
         """
@@ -329,6 +355,9 @@ class ConfusionMatrix:
             gt_bboxes (Array[M, 4]| Array[N, 5]): Ground truth bounding boxes with xyxy/xyxyr format.
             gt_cls (Array[M]): The class labels.
         """
+        # print(f"[DEBUG-PB] ENTRANDO a process_batch")
+        # print(f"[DEBUG-PB] gt_cls.shape={gt_cls.shape}, detections={'None' if detections is None else detections.shape}")
+
         if gt_cls.shape[0] == 0:  # Check if labels is empty
             if detections is not None:
                 detections = detections[detections[:, 4] > self.conf]
@@ -346,13 +375,35 @@ class ConfusionMatrix:
         gt_classes = gt_cls.int()
         detection_classes = detections[:, 5].int()
         is_obb = detections.shape[1] == 7 and gt_bboxes.shape[1] == 5  # with additional `angle` dimension
-        iou = (
-            batch_probiou(gt_bboxes, torch.cat([detections[:, :4], detections[:, -1:]], dim=-1))
-            if is_obb
-            else box_iou(gt_bboxes, detections[:, :4])
-        )
 
-        x = torch.where(iou > self.iou_thres)
+        if self.use_containment and not is_obb: ###containment
+
+            #print('processbatch')
+            # Llama a tu nueva función. Nota: pasamos primero pred y luego gt
+            iou = box_containment(detections[:, :4], gt_bboxes)
+            # Como la contención es binaria (0 o 1), cualquier valor > 0.5 es un Match
+            thres = 0.5
+        else:
+            iou = (
+                batch_probiou(gt_bboxes, torch.cat([detections[:, :4], detections[:, -1:]], dim=-1))
+                if is_obb
+                else box_iou(gt_bboxes, detections[:, :4])
+            )
+            thres = self.iou_thres
+
+        # print(f"[DEBUG-PB] iou.shape={iou.shape}, iou.numel()={iou.numel()}")
+
+        if iou.numel() > 0:
+            best_iou = iou.max(dim=0)[0]
+            valid = best_iou > 0
+            # print(f"[DEBUG-PB] best_iou.shape={best_iou.shape}, valid.sum()={valid.sum()}")
+            if valid.any():
+                self.iou_values.append(best_iou[valid].cpu())
+                # print(f"[DEBUG-PB] AÑADIDO a iou_values, len ahora = {len(self.iou_values)}")
+        #else:
+            # print(f"[DEBUG-PB] iou.numel() == 0, NO se añade nada")
+
+        x = torch.where(iou > thres)
         if x[0].shape[0]:
             matches = torch.cat((torch.stack(x, 1), iou[x[0], x[1]][:, None]), 1).cpu().numpy()
             if x[0].shape[0] > 1:
@@ -831,6 +882,7 @@ class DetMetrics(SimpleClass):
         self.box = Metric()
         self.speed = {"preprocess": 0.0, "inference": 0.0, "loss": 0.0, "postprocess": 0.0}
         self.task = "detect"
+        self.use_containment = False
 
     def process(self, tp, conf, pred_cls, target_cls):
         """Process predicted results for object detection and update metrics."""
@@ -850,7 +902,15 @@ class DetMetrics(SimpleClass):
     @property
     def keys(self):
         """Returns a list of keys for accessing specific metrics."""
-        return ["metrics/precision(B)", "metrics/recall(B)", "metrics/mAP50(B)", "metrics/mAP50-95(B)"]
+        suffix = "Contain-Pseudo" if self.use_containment else "B"
+        return [
+            f"metrics/precision({suffix})",
+            f"metrics/recall({suffix})",
+            f"metrics/mAP50({suffix})",
+            f"metrics/mAP50-95({suffix})",
+            # f"metrics/fitness({suffix})",
+        ]
+
 
     def mean_results(self):
         """Calculate mean of detected objects & return precision, recall, mAP50, and mAP50-95."""
@@ -878,12 +938,23 @@ class DetMetrics(SimpleClass):
     @property
     def results_dict(self):
         """Returns dictionary of computed performance metrics and statistics."""
-        return dict(zip(self.keys + ["fitness"], self.mean_results() + [self.fitness]))
+        base = dict(zip(self.keys, self.mean_results()))   # ← ya no necesita el zip manual con "fitness"
+        suffix = "Contain-Pseudo" if self.use_containment else "B"
+        base[f"metrics/mean_iou({suffix})"] = getattr(self, "mean_iou", 0.0)
+        base[f"metrics/fitness({suffix})"] = self.fitness   # ← añadir fitness aquí, fuera del zip
+
+        return base
 
     @property
     def curves(self):
         """Returns a list of curves for accessing specific metrics curves."""
-        return ["Precision-Recall(B)", "F1-Confidence(B)", "Precision-Confidence(B)", "Recall-Confidence(B)"]
+        suffix = "Contain-Pseudo" if self.use_containment else "B"
+        return [
+            f"Precision-Recall({suffix})",
+            f"F1-Confidence({suffix})",
+            f"Precision-Confidence({suffix})",
+            f"Recall-Confidence({suffix})",
+        ]
 
     @property
     def curves_results(self):
@@ -1275,8 +1346,8 @@ class OBBMetrics(SimpleClass):
 
     @property
     def results_dict(self):
-        """Returns dictionary of computed performance metrics and statistics."""
-        return dict(zip(self.keys + ["fitness"], self.mean_results() + [self.fitness]))
+        base = dict(zip(self.keys + ["fitness"], self.mean_results() + [self.fitness]))
+        return base
 
     @property
     def curves(self):

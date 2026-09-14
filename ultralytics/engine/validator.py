@@ -203,7 +203,9 @@ class BaseValidator:
         if self.training:
             model.float()
             results = {**stats, **trainer.label_loss_items(self.loss.cpu() / len(self.dataloader), prefix="val")}
-            return {k: round(float(v), 5) for k, v in results.items()}  # return results as 5 decimal place floats
+            # print(f"[DEBUG-VALIDATOR] mean_iou en stats: {stats.get('metrics/mean_iou(B)', 'NO ESTÁ')}")
+            # print(f"[DEBUG-VALIDATOR] mean_iou en results: {results.get('metrics/mean_iou(B)', 'NO ESTÁ')}")
+            return {k: round(float(v), 5) for k, v in results.items()}
         else:
             LOGGER.info(
                 "Speed: {:.1f}ms preprocess, {:.1f}ms inference, {:.1f}ms loss, {:.1f}ms postprocess per image".format(

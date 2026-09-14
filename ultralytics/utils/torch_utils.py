@@ -488,10 +488,16 @@ def init_seeds(seed=0, deterministic=False):
     # torch.backends.cudnn.benchmark = True  # AutoBatch problem https://github.com/ultralytics/yolov5/issues/9287
     if deterministic:
         if TORCH_2_0:
-            torch.use_deterministic_algorithms(True, warn_only=True)  # warn if deterministic is not possible
+            torch.use_deterministic_algorithms(True, warn_only=False)  # warn if deterministic is not possible
             torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False  # explicitly disable benchmark for determinism
             os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
             os.environ["PYTHONHASHSEED"] = str(seed)
+            LOGGER.info(
+                f"Deterministic training enabled with seed={seed}. "
+                f"For full determinism, also set PYTHONHASHSEED before launch:\n"
+                f"    export PYTHONHASHSEED={seed}"
+            )
         else:
             LOGGER.warning("WARNING ⚠️ Upgrade to torch>=2.0.0 for deterministic training.")
     else:

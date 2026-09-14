@@ -1,0 +1,30 @@
+method: bayes
+metric:
+  goal: maximize
+  name: metrics/fitness(B)
+parameters:
+  box_weight:
+    values:
+    - 1.5
+    - 4.5
+    - 7.5
+    - 10.5
+    - 13.5
+  cls_weight:
+    values:
+    - 0.2
+    - 0.65
+    - 0.8
+  dfl_weight:
+    values:
+    - 0.5
+    - 1
+    - 1.5
+    - 2
+  lr0:
+    values:
+    - 0.001
+    - 0.0001
+    - 1e-06
+
+program: /mnt/nfs/home/dbenitom/Yolo-DinoV2-deterministic-copy/sweep_demo.py
