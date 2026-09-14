@@ -44,6 +44,9 @@ ultralytics.egg-info
 #  before PyInstaller builds the exe, so as to inject date/other info into it.
 *.manifest
 *.spec
+*.pdf
+*.txt
+*csv
 
 # Installer logs
 pip-log.txt
