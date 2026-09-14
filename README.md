@@ -10,7 +10,11 @@ The code is intended for research and reproducible experimentation. Dataset file
 - A custom `DinoV2Patches` layer that converts DINOv2 patch tokens into a feature map for the YOLO detection head.
 - Deterministic PyTorch settings in the training examples and the local Ultralytics utilities.
 - Standard Ultralytics training, validation, prediction, and experiment logging workflows.
+<<<<<<< HEAD
 - Optional Weights & Biases integration through `demo.py` and `sweep_demo.py`.
+=======
+- Optional Weights & Biases integration through `train.py` and `sweep_train.py`.
+>>>>>>> 2ef294c1bce7b42c8ebff79ed637b3e35b30deac
 
 ## Repository layout
 
@@ -35,7 +39,7 @@ The code is intended for research and reproducible experimentation. Dataset file
 - A compatible RAD-DINO checkpoint in SafeTensors format
 - An Ultralytics-format detection dataset YAML file
 
-The project uses the dependencies declared in [`pyproject.toml`](pyproject.toml). Install the local package in editable mode:
+The project uses the dependencies listed in [`requirements.txt`](requirements.txt). Install all required dependencies in your environment:
 
 ```bash
 git clone https://github.com/<YOUR-USER>/<YOUR-REPOSITORY>.git
@@ -43,14 +47,13 @@ cd Yolo-DinoV2-deterministic-copy
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install -e .
+python -m pip install -r requirements.txt
 ```
 
 For development and tests:
 
 ```bash
-python -m pip install -e ".[dev]"
-```
+python -m pip install -r requirements-dev.txt```
 
 ## External model assets
 
@@ -103,10 +106,17 @@ model.train(
 )
 ```
 
+<<<<<<< HEAD
 Or adapt the project defaults in `demo.py`:
 
 ```bash
 python demo.py
+=======
+Or adapt the project defaults in `train.py`:
+
+```bash
+python train.py
+>>>>>>> 2ef294c1bce7b42c8ebff79ed637b3e35b30deac
 ```
 
 Exact reproducibility can still vary with GPU hardware, CUDA/cuDNN versions, multiprocessing, and the data-loading configuration. Record the commit, environment, dataset revision, checkpoint, seed, device, and training arguments for each experiment.
@@ -137,15 +147,24 @@ The script resizes the image to 640x640, applies the configured confidence and I
 
 ## Experiment tracking
 
+<<<<<<< HEAD
 `demo.py` and `sweep_demo.py` can log training runs to Weights & Biases. Configure the W&B project and authenticate before running:
 
 ```bash
 wandb login
 python demo.py
+=======
+`train.py` and `sweep_train.py` can log training runs to Weights & Biases. Configure the W&B project and authenticate before running:
+
+```bash
+wandb login
+python train.py
+>>>>>>> 2ef294c1bce7b42c8ebff79ed637b3e35b30deac
 ```
 
 Disable or remove the W&B integration when working offline.
 
+<<<<<<< HEAD
 ## Testing
 
 Run the lightweight test suite with:
@@ -156,6 +175,8 @@ pytest -q
 
 Some tests require additional packages, downloaded assets, or a CUDA device. Run the relevant test module when working on a specific subsystem.
 
+=======
+>>>>>>> 2ef294c1bce7b42c8ebff79ed637b3e35b30deac
 ## Acknowledgements
 
 - [DINOv2](https://github.com/facebookresearch/dinov2) by Meta AI Research.
@@ -168,4 +189,8 @@ This repository includes and modifies code from Ultralytics. Review the [Ultraly
 
 ## Contributing
 
+<<<<<<< HEAD
 Issues and pull requests are welcome. Please include the command, environment, dataset/configuration assumptions, and a concise reproduction when reporting a problem.
+=======
+Issues and pull requests are welcome. Please include the command, environment, dataset/configuration assumptions, and a concise reproduction when reporting a problem.
+>>>>>>> 2ef294c1bce7b42c8ebff79ed637b3e35b30deac
