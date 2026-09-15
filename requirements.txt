@@ -13,7 +13,7 @@ annotated-doc==0.0.4
 annotated-types==0.7.0
 antlr4-python3-runtime==4.9.3
 anyio==4.5.2
-asttokens==3.0.1
+asttokens==3.0.2
 astunparse==1.6.3
 attrs==25.3.0
 backcall==0.2.0
