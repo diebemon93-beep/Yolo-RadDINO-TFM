@@ -96,7 +96,7 @@ matplotlib==3.7.5
 matplotlib-inline==0.1.7
 mdurl==0.1.2
 mistune==3.3.4
-ml-dtypes==0.2.0
+ml-dtypes==0.6.0
 mmcv==2.2.0
 -e git+https://github.com/<user>/mmdetection.git@<commit>#egg=mmdet
 mmengine==0.10.7
