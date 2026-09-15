@@ -46,7 +46,7 @@ ultralytics.egg-info
 *.spec
 *.pdf
 *.txt
-*csv
+*.csv
 
 # Installer logs
 pip-log.txt

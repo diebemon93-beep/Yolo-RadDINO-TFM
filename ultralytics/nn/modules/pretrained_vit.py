@@ -18,27 +18,28 @@ class DinoV2Patches(nn.Module):
     def __init__(self, in_chanels=3, out_channels=768, size="base"):
         local_rank = int(os.environ.get("LOCAL_RANK", 0))
 
-        print(f"Initializing DinoV2Patches with size: {size}")
+        print(f"Loading DinoV2Patches with size: {size}")
         super(DinoV2Patches, self).__init__()
         self.size = size
         
         self.backbone = load("facebookresearch/dinov2", dino_backbones[self.size]["name"], pretrained=False)
 
         try:
-            backbone_state_dict = load_file('/mnt/nfs/home/dbenitom/backbone_compatible.safetensors')
+            backbone_state_dict = load_file('backbone_path')
             missing, unexpected = self.backbone.load_state_dict(backbone_state_dict, strict=False)
             
             if local_rank == 0:
-                print(f'==> RAD-DINO loaded: missing={len(missing)}, unexpected={len(unexpected)}')
+                print(f'RAD-DINO loaded: missing={len(missing)}, unexpected={len(unexpected)}')
                 if len(missing) > 0:
-                    print(f"⚠️ ¡Aviso! Hay {len(missing)} capas que no recibieron pesos preentrenados.")
-                    print(f"Capas faltantes de muestra: {missing[:5]}")
+                    print(f"Warning: {len(missing)} layers did not receive pretrained weights.")
+                    print(f"Sample missing layers: {missing[:5]}")
                     
         except Exception as e:
             if local_rank == 0:
-                print(f'❌ Error crítico cargando los pesos de RAD-DINO: {e}')
+                print(f'Error loading RAD-DINO weights: {e}')
             raise e
 
+        # LoRA LAYERS
         # lora_config = LoraConfig(
         #     r=16,                                
         #     lora_alpha=32,                       
@@ -47,15 +48,9 @@ class DinoV2Patches(nn.Module):
         #     bias="none"
         # )
         
-        # #Envolvemos el ViT de DinoV2 con los adaptadores LoRA
+        # Wrap the DinoV2 ViT with LoRA adapters
         # self.backbone = get_peft_model(self.backbone, lora_config)
 
-        # Configuración estricta de gradientes para evitar asimetrías entre lora_A y lora_B
-        # for name, param in self.backbone.named_parameters():
-        #     if "lora" in name.lower():
-        #         param.requires_grad_(True)       # Abrir tanto lora_A como lora_B
-        #     elif "backbone" in name:
-        #         param.requires_grad_(False)      # Congelar pesos base de RAD-DINO
 
         MIMIC_MEAN = (0.5307, 0.5307, 0.5307)
         MIMIC_STD = (0.2583, 0.2583, 0.2583)
@@ -90,50 +85,5 @@ class DinoV2Patches(nn.Module):
         x = x.permute(0, 2, 1)
         x = x.reshape(batch_size, self.out_channels, int(mask_dim[0]), int(mask_dim[1]))
 
-        # Para auditoría en vivo desde el forward, simplemente añades:
-        self.debug_gradientes_estatico(x)
-
         return x
-
-    def debug_gradientes_estatico(self, x_output):
-            # Escudo para DDP: solo audita el proceso principal (Rank 0) y una vez por ciclo/época
-            import os
-            # local_rank = int(os.environ.get("LOCAL_RANK", 0))
-            # if getattr(self, "ya_auditado", False) or local_rank != 0:
-            #     return
-
-
-            # lora_con_grad = []
-            # lora_sin_grad = []
-            # base_con_grad = []
-            # base_sin_grad = []
-
-            # for name, param in self.backbone.named_parameters():
-            #     if "lora" in name.lower():
-            #         if param.requires_grad:
-            #             lora_con_grad.append(name)
-            #         else:
-            #             lora_sin_grad.append(name)
-            #     else:
-            #         if param.requires_grad:
-            #             base_con_grad.append(name)
-            #         else:
-            #             base_sin_grad.append(name)
-
-            # # ── REPORTE COMBINADO (ESTÁTICO + DINÁMICO) ─────────────────────────────────
-
-            # if x_output.grad_fn is None or len(lora_sin_grad) > 0:
-
-            #     print("   Tus capas LoRA están listas en memoria (True), pero la salida 'x' está")
-            #     print("   MUERTA (grad_fn=None) debido al bloque 'with torch.no_grad()'.")
-            #     print("   ¡Los gradientes del backward NO van a actualizar LoRA!")
-            
-            #     print(f"  [ESTÁTICO] Matrices LoRA activas (True)    : {len(lora_con_grad)}")
-            #     print(f"  [ESTÁTICO] Matrices LoRA congeladas (False): {len(lora_sin_grad)}")
-            #     print(f"  [ESTÁTICO] Pesos Base activos (True)       : {len(base_con_grad)}")
-            #     print(f"  [ESTÁTICO] Pesos Base congelados (False)   : {len(base_sin_grad)}")
-            #     print("-" * 60)
-            #     print(f"  [DINÁMICO] ¿Output 'x' requiere gradiente? : {x_output.requires_grad}")
-            #     print(f"  [DINÁMICO] Función de gradiente (grad_fn)  : {x_output.grad_fn}")
-                
 

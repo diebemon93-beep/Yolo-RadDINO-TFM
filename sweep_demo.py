@@ -4,50 +4,52 @@ import os
 
 
 import torch
-# Forzar a Python a buscar primero en tu carpeta local del proyecto
-project_root = "/mnt/nfs/home/dbenitom/Yolo-DinoV2-deterministic-copy"  # Cambia esto a la ruta de tu proyecto
+# Force Python to search the local project directory first
+project_root = "project_root"  # Update this to your project path
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 import ultralytics.nn.tasks as tasks
 
-# Cambia la estrategia de compartición para evitar saturar los File Descriptors
+# Change the sharing strategy to avoid saturating file descriptors
 torch.multiprocessing.set_sharing_strategy('file_system')
 
 
-# Forzar algoritmos deterministas en todo PyTorch
+# Force deterministic algorithms across PyTorch
 torch.use_deterministic_algorithms(True, warn_only=False)
 
 os.environ['PYTHONHASHSEED'] = '1'
 
+project_root = os.environ.get("YOLO_DINOV2_PROJECT_ROOT", "/path/to/project")
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-from ultralytics.nn.modules.pretrained_vit import DinoV2Patches  
+from ultralytics.nn.modules.pretrained_vit import DinoV2Patches
 
-# 4. TRUCO MAGISTRAL: Inyectamos tu módulo en los globales oficiales
-# Esto hace que 'parse_model' encuentre tu capa aunque use el paquete limpio.
+# Inject the custom module into the official globals so parse_model can resolve it.
 tasks.DinoV2Patches = DinoV2Patches
 tasks.__dict__["DinoV2Patches"] = DinoV2Patches
 
 import os
 import wandb
 from ultralytics import YOLO
-# Usamos el import nativo que no rompe arquitecturas personalizadas
+# Use the native import so custom architectures are not broken.
 from ultralytics.utils.callbacks import add_integration_callbacks
 
 import ultralytics.data.build as build
 from weighted_dataset import YOLOWeightedDataset
 
-# Interceptamos la clase por defecto de Ultralytics con tu clase balanceada
+# Intercept the default Ultralytics class with the custom balanced class.
 # build.YOLODataset = YOLOWeightedDataset
-# print("🚀 Clase YOLODataset interceptada con éxito. Usando YOLOWeightedDataset para balanceo.")
+# print("YOLODataset successfully intercepted. Using YOLOWeightedDataset for balancing.")
 
-# Forzamos los parches de seguridad para evitar fallos de formato con el .yaml
+# Force safety patches to avoid YAML format issues.
 os.environ["WANDB_PLOT_BBOX_ARR"] = "false"
 os.environ["WANDB_LOG_MODEL"] = "true"
 
-# Valores por defecto del sweep
+# Default sweep values
 DEFAULTS = {
-    "lr0":        1e-4,
+    "lr0": 1e-4,
     "box_weight": 7.5,
     "cls_weight": 0.5,
     "dfl_weight": 1.5,
@@ -58,21 +60,21 @@ if __name__ == "__main__":
 
     if local_rank == 0:
         wandb.init(
-            project="YOLO-DINO_pruebas_wandb",
+            project="YOLO-DINO_wandb_runs",
             job_type="training",
             config=DEFAULTS,
             mode="online",
         )
-        config = dict(wandb.config)  # convertir a dict normal
+        config = dict(wandb.config)
 
-        # Broadcast config a otros ranks via variable de entorno
+        # Broadcast the config to the other ranks via environment variables.
         import json
         os.environ["SWEEP_CONFIG"] = json.dumps(config)
     else:
-        # Ranks secundarios leen la config del proceso padre
+        # Secondary ranks read the config from the parent process.
         import json
         import time
-        # Esperar a que rank 0 escriba la config
+        # Wait until rank 0 writes the config.
         for _ in range(30):
             if "SWEEP_CONFIG" in os.environ:
                 break
@@ -80,13 +82,13 @@ if __name__ == "__main__":
         config = json.loads(os.environ.get("SWEEP_CONFIG", json.dumps(DEFAULTS)))
 
     if local_rank == 0:
-        print(f"[Sweep] lr0={config['lr0']}, box={config['box_weight']}, "
+        print(f"Sweep configuration: lr0={config['lr0']}, box={config['box_weight']}, "
               f"cls={config['cls_weight']}, dfl={config['dfl_weight']}")
 
-    model = YOLO("/mnt/nfs/home/dbenitom/pruebas/vincxr/yolov8n_dinov2_b.yaml")
+    model = YOLO("model_root")
 
     model.train(
-        data="/mnt/nfs/home/dbenitom/pruebas/vincxr/vincxr.yaml",
+        data="dataset_root",
         epochs=50,
         imgsz=518,
         patience=15,
@@ -118,20 +120,13 @@ if __name__ == "__main__":
         pretrained=False,
     )
 
-    # model.val(
-    #     data="/mnt/nfs/home/dbenitom/pruebas/vincxr/vincxr.yaml",
-    #     device=None,
-    #     batch=32,
-    #     workers=8,
-    # )
-
     if local_rank == 0 and wandb.run is not None:
-            # Extraemos las métricas registradas en el summary por Ultralytics
-            map50 = wandb.run.summary.get("metrics/mAP50(B)", 0.0)
-            map50_95 = wandb.run.summary.get("metrics/mAP50-95(B)", 0.0)
+        # Extract the metrics recorded in the Ultralytics summary.
+        map50 = wandb.run.summary.get("metrics/mAP50(B)", 0.0)
+        map50_95 = wandb.run.summary.get("metrics/mAP50-95(B)", 0.0)
 
-            # Calculamos la métrica combinada
-            custom_score = 0.1 * map50 + 0.9 * map50_95
+        # Compute the combined metric.
+        custom_score = 0.1 * map50 + 0.9 * map50_95
 
-            # Guardamos en el summary directamente para que el Sweep la lea sin problemas de steps
-            wandb.run.summary["metrics/custom_score"] = custom_score
+        # Save it directly in the summary so the sweep can read it without step issues.
+        wandb.run.summary["metrics/custom_score"] = custom_score

@@ -27,4 +27,4 @@ parameters:
     - 0.0001
     - 1e-06
 
-program: /mnt/nfs/home/dbenitom/Yolo-DinoV2-deterministic-copy/sweep_demo.py
+program: path_to_sweep_executable

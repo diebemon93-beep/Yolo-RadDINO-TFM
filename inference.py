@@ -8,84 +8,84 @@ import matplotlib.pyplot as plt
 from ultralytics import YOLO
 import re
 
-# Forzar a Python a encontrar el módulo 'dinov2' y 'rad_dino'
-DINO_PATH = "/mnt/nfs/home/dbenitom/dinov2"
+# Force Python to find the 'dinov2' and 'rad_dino' modules.
+DINO_PATH = "DINO_PATH"
 if DINO_PATH not in sys.path:
     sys.path.insert(0, DINO_PATH)
 
 # ==============================================================================
-# CONFIGURACIÓN DE RUTAS Y FORMATO
+# PATH AND FORMAT CONFIGURATION
 # ==============================================================================
-MODEL_PATH = "/mnt/nfs/home/dbenitom/pruebas/pedi-cxr/history/definitivo/lp_base_50_medium_sgd_adapted30/weights/best.pt"
+MODEL_PATH = "path_to_best.pt"
 
-IMAGES_DIR = "/mnt/nfs/home/dbenitom/pruebas/pedi-cxr/images/test"
-LABELS_DIR = "/mnt/nfs/home/dbenitom/pruebas/pedi-cxr/labels/test"
-SAVE_DIR = "/mnt/nfs/home/dbenitom/Yolo-DinoV2-deterministic-copy"
+IMAGES_DIR = "images_path"
+LABELS_DIR = "labels_path"
+SAVE_DIR = "save_dir"
 
 # ------------------------------------------------------------------------------
-# MODO DE PROCESAMIENTO
-# Si 'SINGLE_IMAGE_NAME' tiene un nombre de archivo (ej. "0a1b2c3d.png"), 
-# procesará solo esa imagen. Si se deja en None o "", utilizará el rango START/END.
+# PROCESSING MODE
+# If SINGLE_IMAGE_NAME contains a filename (for example, "0a1b2c3d.png"),
+# only that image will be processed. If left as None or an empty string, it will use START/END mode.
 # ------------------------------------------------------------------------------
-SINGLE_IMAGE_NAME = "ecdd955ef381372be31bd48f9424d6dd.png"  # p. ej. "10328dfec9669c5ca24bbf93363dc2ba.png"
+SINGLE_IMAGE_NAME = "1.png"  # e.g. "10328dfec9669c5ca24bbf93363dc2ba.png"
 
-START_IMG = 1     # Primera imagen a analizar (si SINGLE_IMAGE_NAME es None)
-END_IMG = 1       # Última imagen a analizar (si SINGLE_IMAGE_NAME es None)
+START_IMG = 1     # First image to analyze (if SINGLE_IMAGE_NAME is None)
+END_IMG = 1       # Last image to analyze (if SINGLE_IMAGE_NAME is None)
 
 TARGET_SIZE = (640, 640)
 
 # ==============================================================================
-# CONFIGURACIÓN DE MAPEO DE CLASES GROUND TRUTH (GT)
+# GROUND TRUTH (GT) CLASS MAPPING CONFIGURATION
 # ==============================================================================
 USE_GT_CLASS_MAPPING = False
 
 GT_CLASS_MAPPING = {
-    0: "Airway Compression",
-    1: "Calcified Parenchyma",
-    2: "Cavities",
-    3: "Collapsed Lung",
-    4: "Hyperinflation",
-    5: "Intersticial Opacification",
-    6: "Lymphadenopathy",
-    7: "Miliary",
-    8: "Opacification",
-    9: "Pleural Effusion"
+    0: "",
+    1: "",
+    2: "",
+    3: "",
+    4: "",
+    5: "",
+    6: "",
+    7: "",
+    8: "",
+    9: ""
 }
 
 # ==============================================================================
-# PALETA DE COLORES FIJA POR CLASE
+# FIXED CLASS COLOR PALETTE
 # ==============================================================================
 CLASS_COLORS = {
-    "Airway compression": (0.121, 0.466, 0.705),
-    "Hyperinflation": (1.000, 0.498, 0.055),
-    "Cavities": (0.173, 0.627, 0.173),
-    "Collapsed lung": (0.839, 0.153, 0.157),
-    "Calcified parenchyma": (0.580, 0.404, 0.741),
-    "Interstitial opacification": (0.549, 0.337, 0.294),
-    "Lymphadenopathy": (0.890, 0.467, 0.761),
-    "Miliary": (0.498, 0.498, 0.498),
-    "Airspace opacification": (0.737, 0.741, 0.133),
-    "Pleural effusion": (0.090, 0.745, 0.811),
+    "": (0.121, 0.466, 0.705),
+    "": (1.000, 0.498, 0.055),
+    "": (0.173, 0.627, 0.173),
+    "": (0.839, 0.153, 0.157),
+    "": (0.580, 0.404, 0.741),
+    "": (0.549, 0.337, 0.294),
+    "": (0.890, 0.467, 0.761),
+    "": (0.498, 0.498, 0.498),
+    "": (0.737, 0.741, 0.133),
+    "": (0.090, 0.745, 0.811),
 }
 
 
 # ==============================================================================
-# FORMATEO DE NOMBRES DE CLASE
+# CLASS NAME FORMATTING
 # ==============================================================================
 def format_class_name(name):
-    name = re.sub(r'aveolar', 'alveolar', name, flags=re.IGNORECASE)
-    name = re.sub(r'intersticial', 'interstitial', name, flags=re.IGNORECASE)
+    name = re.sub(r'', '', name, flags=re.IGNORECASE)
+    name = re.sub(r'', '', name, flags=re.IGNORECASE)
 
-    if name.strip().lower() == "opacification":
-        return "Airspace opacification"
+    if name.strip().lower() == "":
+        return ""
 
-    if name.strip().upper() == "ILD":
-        return "ILD"
+    if name.strip().upper() == "":
+        return ""
 
     parts = name.split()
     if parts:
         for i, part in enumerate(parts):
-            if part.upper() in ["ILD", "CXRs", "CXR", "TB"]:
+            if part.upper() in ["", "", "", ""]:
                 parts[i] = part.upper()
             elif i == 0:
                 parts[i] = part.capitalize()
@@ -97,7 +97,7 @@ def format_class_name(name):
 
 
 # ==============================================================================
-# OBTENER COLOR DE UNA CLASE
+# GET CLASS COLOR
 # ==============================================================================
 def get_class_color(cls_name):
     cls_name = format_class_name(cls_name)
@@ -106,24 +106,17 @@ def get_class_color(cls_name):
         return CLASS_COLORS[cls_name]
 
     aliases = {
-        "Lung opacity": "Lung opacity",
-        "Nodule/mass": "Nodule/mass",
-        "Pleural effusion": "Pleural effusion",
-        "Pleural thickening": "Pleural thickening",
-        "Pulmonary fibrosis": "Pulmonary fibrosis",
-        "Aortic enlargement": "Aortic enlargement",
-        "Other lesion": "Other lesion",
     }
 
     if cls_name in aliases:
         return CLASS_COLORS[aliases[cls_name]]
 
-    print(f"WARNING: No hay color definido para la clase '{cls_name}'. Se utilizará gris.")
+    print(f"Warning: no color is defined for class '{cls_name}'. Gray will be used instead.")
     return (0.5, 0.5, 0.5)
 
 
 # ==============================================================================
-# DIBUJAR CAJAS Y ETIQUETAS
+# DRAW BOXES AND LABELS
 # ==============================================================================
 def draw_custom_boxes(img_path, target_size, class_names, boxes_list, is_gt=True):
     img = cv2.imread(img_path)
@@ -135,7 +128,7 @@ def draw_custom_boxes(img_path, target_size, class_names, boxes_list, is_gt=True
     if not boxes_list:
         return img, []
 
-    # PASADA 1: DIBUJAR CAJAS
+    # PASS 1: DRAW BOXES
     for (x1, y1, x2, y2, cls_id, _) in boxes_list:
         if is_gt:
             color_cv = (0, 255, 0)
@@ -146,7 +139,7 @@ def draw_custom_boxes(img_path, target_size, class_names, boxes_list, is_gt=True
 
         cv2.rectangle(img, (x1, y1), (x2, y2), color_cv, thickness)
 
-    # PASADA 2: POSICIONAMIENTO DE ETIQUETAS
+    # PASS 2: LABEL POSITIONING
     occupied_slots = []
     labels_to_render = []
 
@@ -218,7 +211,7 @@ def draw_custom_boxes(img_path, target_size, class_names, boxes_list, is_gt=True
 
 if __name__ == "__main__":
 
-    print(f"==> Cargando pesos del modelo desde: {MODEL_PATH}")
+    print(f"Loading model weights from: {MODEL_PATH}")
     model = YOLO(MODEL_PATH)
 
     class_names = {k: format_class_name(v) for k, v in model.names.items()}
@@ -229,19 +222,19 @@ if __name__ == "__main__":
         gt_class_names = class_names
 
     # ==========================================================================
-    # SELECCIÓN DE IMAGEN(ES)
+    # IMAGE SELECTION
     # ==========================================================================
     selected_images = []
 
     if SINGLE_IMAGE_NAME and SINGLE_IMAGE_NAME.strip():
-        # Procesar única imagen
+        # Process a single image
         target_path = os.path.join(IMAGES_DIR, SINGLE_IMAGE_NAME.strip())
         if not os.path.exists(target_path):
-            raise FileNotFoundError(f"No se encontró la imagen especificada: {target_path}")
+            raise FileNotFoundError(f"The specified image was not found: {target_path}")
         selected_images.append(target_path)
-        print(f"\n==> Modo imagen individual activado: {SINGLE_IMAGE_NAME}")
+        print(f"\nSingle-image mode enabled: {SINGLE_IMAGE_NAME}")
     else:
-        # Procesar rango de imágenes
+        # Process an image range
         valid_extensions = ("*.jpg", "*.jpeg", "*.png", "*.bmp")
         all_images = []
         for ext in valid_extensions:
@@ -249,7 +242,7 @@ if __name__ == "__main__":
             all_images.extend(glob(os.path.join(IMAGES_DIR, ext.upper())))
 
         if not all_images:
-            raise FileNotFoundError(f"No se encontraron imágenes en: {IMAGES_DIR}")
+            raise FileNotFoundError(f"No images were found in: {IMAGES_DIR}")
 
         all_images = sorted(all_images)
         total_found = len(all_images)
@@ -258,13 +251,13 @@ if __name__ == "__main__":
         end_idx = min(total_found, END_IMG)
 
         if start_idx >= total_found or start_idx >= end_idx:
-            raise ValueError(f"Rango inválido. Total disponibles: {total_found}")
+            raise ValueError(f"Invalid range. Total available: {total_found}")
 
         selected_images = all_images[start_idx:end_idx]
-        print(f"\n==> Procesando {len(selected_images)} imágenes en rango ({START_IMG} a {END_IMG})...")
+        print(f"\nProcessing {len(selected_images)} images in range ({START_IMG} to {END_IMG})...")
 
     # ==========================================================================
-    # INFERENCIA
+    # INFERENCE
     # ==========================================================================
     results = model.predict(
         source=selected_images,
@@ -280,14 +273,14 @@ if __name__ == "__main__":
     os.makedirs(SAVE_DIR, exist_ok=True)
 
     # ==========================================================================
-    # PROCESAR CADA IMAGEN INDIVIDUALMENTE
+    # PROCESS EACH IMAGE INDIVIDUALLY
     # ==========================================================================
     for result in results:
         img_path = result.path
         base_name = os.path.splitext(os.path.basename(img_path))[0]
         txt_path = os.path.join(LABELS_DIR, f"{base_name}.txt")
 
-        # 1. PARSEO DE PREDICCIONES
+        # 1. PARSE PREDICTIONS
         pred_boxes_list = []
         if result.boxes is not None:
             for box in result.boxes:
@@ -302,7 +295,7 @@ if __name__ == "__main__":
 
                 pred_boxes_list.append((x1, y1, x2, y2, cls_id, conf))
 
-        # 2. PARSEO DE GROUND TRUTH
+        # 2. PARSE GROUND TRUTH
         gt_boxes_list = []
         if os.path.exists(txt_path):
             with open(txt_path, "r") as f:
@@ -321,7 +314,7 @@ if __name__ == "__main__":
 
                     gt_boxes_list.append((x1, y1, x2, y2, cls_id, None))
 
-        # 3. DESDUPLICACIÓN DE GT
+        # 3. GT DEDUPLICATION
         unique_gt_boxes = []
         seen_coords = set()
         for box in gt_boxes_list:
@@ -331,7 +324,7 @@ if __name__ == "__main__":
                 unique_gt_boxes.append(box)
         gt_boxes_list = unique_gt_boxes
 
-        # 4. CREAR Y GUARDAR FIGURA DE PREDICCIÓN
+        # 4. CREATE AND SAVE THE PREDICTION FIGURE
         fig_pred, ax_pred = plt.subplots(1, 1, figsize=(8, 8))
         img_pred_custom, labels_pred = draw_custom_boxes(
             img_path, TARGET_SIZE, class_names, pred_boxes_list, is_gt=False
@@ -352,7 +345,7 @@ if __name__ == "__main__":
         fig_pred.savefig(out_pred, format='pdf', bbox_inches='tight', pad_inches=0)
         plt.close(fig_pred)
 
-        # 5. CREAR Y GUARDAR FIGURA DE GROUND TRUTH
+        # 5. CREATE AND SAVE THE GROUND TRUTH FIGURE
         fig_gt, ax_gt = plt.subplots(1, 1, figsize=(8, 8))
         img_gt_custom, labels_gt = draw_custom_boxes(
             img_path, TARGET_SIZE, gt_class_names, gt_boxes_list, is_gt=True
@@ -373,8 +366,8 @@ if __name__ == "__main__":
         fig_gt.savefig(out_gt, format='pdf', bbox_inches='tight', pad_inches=0)
         plt.close(fig_gt)
 
-        print(f"➡️ Guardado exitoso de {base_name}:")
-        print(f"   • Predicción: {os.path.basename(out_pred)}")
-        print(f"   • Ground Truth: {os.path.basename(out_gt)}")
+        print(f"Saved output for {base_name}:")
+        print(f"   Prediction: {os.path.basename(out_pred)}")
+        print(f"   Ground Truth: {os.path.basename(out_gt)}")
 
-    print("\n🎉 ¡Procesamiento finalizado con éxito!")
+    print("\nProcessing complete.")

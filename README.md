@@ -1,74 +1,74 @@
 # YOLO-DINOv2 Deterministic
 
-This repository combines an Ultralytics YOLO detection head with a DINOv2 Vision Transformer backbone for object detection. It contains the custom `DinoV2Patches` module, model configuration files, deterministic training helpers, validation scripts, and analysis utilities used in the project experiments.
+This repository combines a DINOv2 Vision Transformer backbone with Ultralytics YOLO detection heads for reproducible object detection experiments. It includes the custom DINOv2 patch module, deterministic training scripts, visualization and validation utilities, and YAML model definitions used in this project.
 
-The code is intended for research and reproducible experimentation. Dataset files, trained checkpoints, and RAD-DINO weights are not included in this repository.
+The project is oriented toward research and experiment reproducibility. Local dataset paths, checkpoints, and external research assets are not bundled in this repository and must be configured in the local environment.
 
 ## Highlights
 
-- DINOv2 register backbones in four sizes: `small`, `base`, `large`, and `giant`.
-- A custom `DinoV2Patches` layer that converts DINOv2 patch tokens into a feature map for the YOLO detection head.
-- Deterministic PyTorch settings in the training examples and the local Ultralytics utilities.
-- Standard Ultralytics training, validation, prediction, and experiment logging workflows.
-<<<<<<< HEAD
-- Optional Weights & Biases integration through `demo.py` and `sweep_demo.py`.
-=======
-- Optional Weights & Biases integration through `train.py` and `sweep_train.py`.
->>>>>>> 2ef294c1bce7b42c8ebff79ed637b3e35b30deac
+- DINOv2 backbones in multiple sizes: `small`, `base`, `large`, and `giant`.
+- Custom `DinoV2Patches` integration that converts DINOv2 patch tokens into a YOLO-compatible feature map.
+- Deterministic PyTorch execution in the training scripts.
+- Project-specific scripts for training, W&B sweeps, validation, and inference.
+- Ultralytics-based model definitions and experiment tracking workflows.
 
 ## Repository layout
 
 | Path | Purpose |
 | --- | --- |
-| `ultralytics/nn/modules/pretrained_vit.py` | DINOv2 backbone integration and patch-token conversion |
-| `yolo_dinov2_configs/` | YOLO model definitions using `DinoV2Patches` |
-| `demo.py` | Deterministic training example |
-| `sweep_demo.py` | Deterministic W&B sweep example |
-| `validation_onerun.py` | Validation of a trained checkpoint |
-| `inference_copy.py` | Single-image inference with custom colored labels |
-| `BootstrapValidator.py` and `paired_bootstraping_comparison.py` | Bootstrap-based evaluation utilities |
-| `class_weights.py` and `weighted_dataset.py` | Class balancing helpers |
-| `tests/` | Ultralytics regression and integration tests |
+| `ultralytics/nn/modules/pretrained_vit.py` | DINOv2 backbone and patch-token conversion logic |
+| `ultralytics/nn/tasks.py` | Ultralytics task registration for the custom module |
+| `yolo_dinov2_configs/` | YOLO model configuration files built around DINOv2 backbones |
+| `demo.py` | Main deterministic training script with W&B logging |
+| `sweep_demo.py` | Sweep-based hyperparameter training example |
+| `inference.py` | Inference and image-level evaluation workflow |
+| `validation.py` | Bootstrap-style validation experiment script |
+| `BootstrapValidator.py` | Custom validation/bootstrap utility |
+| `runs/` | Saved training outputs and artifacts |
+| `wandb/` | Local Weights & Biases metadata from experiments |
+| `tests/` | Ultralytics regression and validation tests |
 
 ## Requirements
 
-- Python 3.8 or newer
+- Python 3.8+
 - PyTorch and torchvision
-- A CUDA-capable GPU is recommended for DINOv2 training and inference
-- A local checkout of the DINOv2 repository
-- A compatible RAD-DINO checkpoint in SafeTensors format
-- An Ultralytics-format detection dataset YAML file
+- CUDA-capable GPU recommended for training and heavy validation runs
+- Local checkout of the DINOv2 source tree
+- A compatible RAD-DINO or DINOv2 checkpoint in SafeTensors format
+- An Ultralytics-style dataset YAML file for training or validation
 
-The project uses the dependencies listed in [`requirements.txt`](requirements.txt). Install all required dependencies in your environment:
+Install the project dependencies from the repository requirements file:
 
 ```bash
 git clone https://github.com/<YOUR-USER>/<YOUR-REPOSITORY>.git
-cd Yolo-DinoV2-deterministic-copy
+cd project-name
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-For development and tests:
+For development work, you can also install the project in editable mode and additional dev dependencies:
 
 ```bash
-python -m pip install -r requirements-dev.txt```
+python -m pip install -e .
+python -m pip install .[dev]
+```
 
 ## External model assets
 
-`DinoV2Patches` loads the DINOv2 architecture through `torch.hub` and then loads a RAD-DINO-compatible checkpoint from SafeTensors. Before running a script, update the paths in the script and in [`ultralytics/nn/modules/pretrained_vit.py`](ultralytics/nn/modules/pretrained_vit.py) for your environment:
+`DinoV2Patches` expects a local DINOv2 checkout and a compatible backbone checkpoint. Before running training or inference, edit the paths in the scripts for your environment. Typical entries look like:
 
 ```python
 DINO_PATH = "/path/to/dinov2"
 CHECKPOINT_PATH = "/path/to/backbone_compatible.safetensors"
 ```
 
-The current source contains paths from the original research environment. They are examples, not portable defaults. Do not commit private datasets, checkpoints, or credentials to GitHub.
+The repository currently contains example research paths and should be treated as local configuration rather than portable defaults. Do not commit private datasets, personal checkpoints, or credentials to version control.
 
 ## Model configurations
 
-Available configurations are in [`yolo_dinov2_configs/`](yolo_dinov2_configs/):
+The model definitions live in `yolo_dinov2_configs/`:
 
 - `yolo_dinov2_small.yaml`
 - `yolo_dinov2_large.yaml`
@@ -76,19 +76,18 @@ Available configurations are in [`yolo_dinov2_configs/`](yolo_dinov2_configs/):
 - `yolon_dinov2.yaml`
 - `apple_aimv2_large.yaml`
 
-Set `nc` in the selected YAML file to the number of classes in your dataset. The default small configuration uses a 384-channel DINOv2 feature map; the other DINOv2 variants use 768, 1024, or 1536 output channels respectively.
+Set `nc` in the selected YAML file to the number of classes in your dataset. The small configuration produces a 384-channel feature map, while the larger variants use 768, 1024, or 1536 channels.
 
 ## Deterministic training
 
-The training examples enable deterministic PyTorch algorithms and set `PYTHONHASHSEED`. A minimal training pattern is:
+The training scripts set deterministic behavior in PyTorch and fix `PYTHONHASHSEED` before running. A minimal pattern is:
 
 ```python
 import os
-import sys
 import torch
 from ultralytics import YOLO
-from ultralytics.nn.modules.pretrained_vit import DinoV2Patches
 import ultralytics.nn.tasks as tasks
+from ultralytics.nn.modules.pretrained_vit import DinoV2Patches
 
 os.environ["PYTHONHASHSEED"] = "1"
 torch.use_deterministic_algorithms(True, warn_only=False)
@@ -106,24 +105,18 @@ model.train(
 )
 ```
 
-<<<<<<< HEAD
-Or adapt the project defaults in `demo.py`:
+Run the project scripts with:
 
 ```bash
 python demo.py
-=======
-Or adapt the project defaults in `train.py`:
-
-```bash
-python train.py
->>>>>>> 2ef294c1bce7b42c8ebff79ed637b3e35b30deac
+python sweep_demo.py
 ```
 
-Exact reproducibility can still vary with GPU hardware, CUDA/cuDNN versions, multiprocessing, and the data-loading configuration. Record the commit, environment, dataset revision, checkpoint, seed, device, and training arguments for each experiment.
+Both scripts are configured for local research runs and may need path updates for your dataset, DINOv2 checkout, and GPU devices.
 
 ## Validation and inference
 
-Validate a trained model with the Ultralytics API:
+A typical validation flow is:
 
 ```python
 from ultralytics import YOLO
@@ -137,51 +130,47 @@ model.val(
 )
 ```
 
-For the repository's custom single-image rendering, configure `MODEL_PATH`, `IMAGE_PATH`, `DINO_PATH`, and `SAVE_DIR` in `inference_copy.py`, then run:
+For the repository-specific local workflows, edit the paths in `inference.py` or `validation.py` to match your dataset and model outputs, then run:
 
 ```bash
-python inference_copy.py
+python inference.py
+python validation.py
 ```
 
-The script resizes the image to 640x640, applies the configured confidence and IoU thresholds, draws class-specific boxes, and saves a PDF prediction next to the configured output directory.
+These scripts are tailored to the project’s own validation setup and include custom visualization or bootstrap-based evaluation logic.
 
 ## Experiment tracking
 
-<<<<<<< HEAD
-`demo.py` and `sweep_demo.py` can log training runs to Weights & Biases. Configure the W&B project and authenticate before running:
+The project is configured to log runs to Weights & Biases. Authenticate once and then run your selected training script:
 
 ```bash
 wandb login
 python demo.py
-=======
-`train.py` and `sweep_train.py` can log training runs to Weights & Biases. Configure the W&B project and authenticate before running:
-
-```bash
-wandb login
-python train.py
->>>>>>> 2ef294c1bce7b42c8ebff79ed637b3e35b30deac
 ```
 
-Disable or remove the W&B integration when working offline.
+You can also use the sweep script for hyperparameter exploration:
 
-<<<<<<< HEAD
+```bash
+python sweep_demo.py
+```
+
+Disable or remove the W&B integration when working offline or in a restricted environment.
+
 ## Testing
 
-Run the lightweight test suite with:
+Run the lightweight project tests with:
 
 ```bash
 pytest -q
 ```
 
-Some tests require additional packages, downloaded assets, or a CUDA device. Run the relevant test module when working on a specific subsystem.
+Some tests depend on extra packages, downloaded assets, or a CUDA-enabled device. Run the relevant module when debugging a specific subsystem.
 
-=======
->>>>>>> 2ef294c1bce7b42c8ebff79ed637b3e35b30deac
 ## Acknowledgements
 
-- [DINOv2](https://github.com/facebookresearch/dinov2) by Meta AI Research.
-- [Ultralytics](https://github.com/ultralytics/ultralytics) for the YOLO framework.
-- RAD-DINO and the associated medical-imaging research that supplied compatible backbone weights.
+- [DINOv2](https://github.com/facebookresearch/dinov2) by Meta AI Research
+- [Ultralytics](https://github.com/ultralytics/ultralytics) for the YOLO framework
+- RAD-DINO and related research work for compatible backbone weights and experimental setup
 
 ## License
 
@@ -189,8 +178,4 @@ This repository includes and modifies code from Ultralytics. Review the [Ultraly
 
 ## Contributing
 
-<<<<<<< HEAD
-Issues and pull requests are welcome. Please include the command, environment, dataset/configuration assumptions, and a concise reproduction when reporting a problem.
-=======
-Issues and pull requests are welcome. Please include the command, environment, dataset/configuration assumptions, and a concise reproduction when reporting a problem.
->>>>>>> 2ef294c1bce7b42c8ebff79ed637b3e35b30deac
+Issues and pull requests are welcome. Please include the command, environment, dataset assumptions, and a concise reproduction when reporting a bug or experiment issue.

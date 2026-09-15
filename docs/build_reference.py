@@ -14,12 +14,12 @@ from pathlib import Path
 # Constants
 hub_sdk = False
 if hub_sdk:
-    PACKAGE_DIR = Path("/Users/glennjocher/PycharmProjects/hub-sdk/hub_sdk")
+    PACKAGE_DIR = Path("/path/to/PycharmProjects/hub-sdk/hub_sdk")
     REFERENCE_DIR = PACKAGE_DIR.parent / "docs/reference"
     GITHUB_REPO = "ultralytics/hub-sdk"
 else:
     FILE = Path(__file__).resolve()
-    PACKAGE_DIR = FILE.parents[1] / "ultralytics"  # i.e. /Users/glennjocher/PycharmProjects/ultralytics/ultralytics
+    PACKAGE_DIR = FILE.parents[1] / "ultralytics"  # i.e. /path/to/PycharmProjects/ultralytics/ultralytics
     REFERENCE_DIR = PACKAGE_DIR.parent / "docs/en/reference"
     GITHUB_REPO = "ultralytics/ultralytics"
 
