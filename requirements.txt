@@ -220,7 +220,7 @@ tornado==6.4.2
 tqdm==4.68.2
 traitlets==5.14.3
 transformers==4.46.3
-triton==2.1.0
+triton==3.8.0
 ttach==0.0.3
 typing_extensions==4.13.2
 tzdata==2026.2
